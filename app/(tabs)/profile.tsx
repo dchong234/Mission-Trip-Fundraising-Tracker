@@ -2,6 +2,7 @@ import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useApp } from '../../lib/context';
 
 function SettingsRow({
   icon, label, subtitle, onPress, isLast = false,
@@ -32,6 +33,26 @@ function SettingsRow({
 
 export default function Profile() {
   const router = useRouter();
+  const { donations, goal, departureDate, missionCountry } = useApp();
+
+  const totalRaised = donations.reduce((s, d) => s + d.amount, 0);
+  const daysToTrip = departureDate
+    ? Math.max(0, Math.ceil((new Date(departureDate).getTime() - Date.now()) / 86400000))
+    : null;
+  const tripProgress = daysToTrip !== null && departureDate
+    ? Math.min(1, 1 - daysToTrip / 365)
+    : 0;
+  const pctOfGoal = goal > 0 ? ((totalRaised / goal) * 100).toFixed(0) : '0';
+  const overUnder = goal > 0
+    ? totalRaised >= goal ? `+${Math.round(((totalRaised - goal) / goal) * 100)}% from goal` : `${Math.round(((totalRaised / goal) * 100))}% of goal`
+    : 'No goal set';
+
+  // Pick a flag for the country
+  const COUNTRY_FLAGS: Record<string, string> = {
+    'North India': '🇮🇳', 'South India': '🇮🇳', Cambodia: '🇰🇭', Japan: '🇯🇵',
+    Taiwan: '🇹🇼', Nicaragua: '🇳🇮', Philippines: '🇵🇭',
+  };
+  const flag = missionCountry ? (COUNTRY_FLAGS[missionCountry] || '🌍') : '🌍';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -45,7 +66,7 @@ export default function Profile() {
           {/* Decorative circles */}
           <View style={styles.decorCircle1} />
           <View style={styles.decorCircle2} />
-          <Text style={styles.headerTitle}>Jordan's Profile</Text>
+          <Text style={styles.headerTitle}>My Profile</Text>
         </LinearGradient>
 
         {/* Profile picture */}
@@ -59,10 +80,12 @@ export default function Profile() {
             </Pressable>
           </View>
           <Text style={styles.profileName}>Jordan Smith</Text>
-          <View style={styles.locationRow}>
-            <Text style={styles.countryFlag}>🇭🇳</Text>
-            <Text style={styles.locationText}>Honduras</Text>
-          </View>
+          {missionCountry ? (
+            <View style={styles.locationRow}>
+              <Text style={styles.countryFlag}>{flag}</Text>
+              <Text style={styles.locationText}>{missionCountry}</Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Stats cards */}
@@ -72,20 +95,20 @@ export default function Profile() {
               <Text style={styles.statHeaderLabel}>TOTAL RAISED</Text>
               <Text style={styles.statHeaderIcon}>📈</Text>
             </View>
-            <Text style={styles.statValue}>$18,750</Text>
-            <Text style={styles.statSub}>+12% from goal</Text>
+            <Text style={styles.statValue}>${totalRaised.toLocaleString()}</Text>
+            <Text style={styles.statSub}>{overUnder}</Text>
           </View>
           <View style={styles.statCard}>
             <View style={styles.statHeader}>
               <Text style={styles.statHeaderLabel}>DAYS TO TRIP</Text>
               <Text style={styles.statHeaderIcon}>✈️</Text>
             </View>
-            <Text style={styles.statValue}>47</Text>
+            <Text style={styles.statValue}>{daysToTrip !== null ? daysToTrip : '—'}</Text>
             <View style={styles.progressBarBg}>
               <LinearGradient
                 colors={['#008F7A', '#287AB8']}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={[styles.progressBarFill, { width: '65%' }]}
+                style={[styles.progressBarFill, { width: `${Math.round(tripProgress * 100)}%` as any }]}
               />
             </View>
           </View>

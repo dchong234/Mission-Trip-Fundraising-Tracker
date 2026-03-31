@@ -3,22 +3,21 @@ import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useApp } from '../lib/context';
 
 type AmountFilter = 'all' | 'under50' | '50to100' | 'over100';
 
-const initialGiftList = [
-  { id: '1', name: 'Mom', amount: 100, date: 'Nov 16, 2025', autoAdded: false },
-  { id: '2', name: 'Dad', amount: 250, date: 'Nov 15, 2025', autoAdded: true },
-  { id: '3', name: 'Aunt Linda', amount: 75, date: 'Nov 12, 2025', autoAdded: true },
-  { id: '4', name: 'Sarah Johnson', amount: 50, date: 'Nov 10, 2025', autoAdded: true },
-];
-
 export default function GiftList() {
   const router = useRouter();
+  const { donations } = useApp();
   const [autoAdd, setAutoAdd] = useState(true);
   const [showAbout, setShowAbout] = useState(true);
   const [amountFilter, setAmountFilter] = useState<AmountFilter>('all');
-  const [giftList, setGiftList] = useState(initialGiftList);
+
+  // Base list: donations marked addedToSponsorList, plus auto-add $50+ if enabled
+  const giftList = donations
+    .filter(d => d.addedToSponsorList || (autoAdd && d.amount >= 50))
+    .map(d => ({ id: d.id, name: d.name, amount: d.amount, date: d.date, autoAdded: !d.addedToSponsorList && d.amount >= 50 }));
 
   const filtered = giftList.filter(s => {
     if (amountFilter === 'all') return true;
@@ -157,12 +156,7 @@ export default function GiftList() {
                   </View>
                   <Text style={styles.sponsorMeta}>${sponsor.amount} · {sponsor.date}</Text>
                 </View>
-                <Pressable
-                  onPress={() => setGiftList(giftList.filter(s => s.id !== sponsor.id))}
-                  style={styles.removeBtn}
-                >
-                  <Text style={styles.removeBtnText}>✕</Text>
-                </Pressable>
+                <View style={styles.removeBtn} />
               </View>
             ))
           )}

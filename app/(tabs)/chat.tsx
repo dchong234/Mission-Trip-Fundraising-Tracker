@@ -11,6 +11,18 @@ interface Message {
   sender: 'user' | 'ai';
 }
 
+const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+
+const SYSTEM_PROMPT = `You are a helpful AI assistant for a missionary trip fundraising app.
+You help missionaries with:
+- Writing thank you messages to donors
+- Crafting fundraising communication (letters, social media posts, emails)
+- Brainstorming creative fundraiser ideas
+- Tracking and managing donor relationships
+- Providing encouragement and spiritual motivation for the mission
+
+Keep responses warm, faith-inspired, and practical. Be concise but thorough.`;
+
 const suggestions = [
   'Write a semi-formal thank you message to my pastor for his financial support.',
   'Create a quick message that I can send to all of my close friends.',
@@ -22,18 +34,6 @@ const previousChats = [
   { id: '2', title: 'Fundraiser ideas', date: 'Feb 5', preview: 'I need creative ideas...' },
   { id: '3', title: 'Budget planning', date: 'Feb 3', preview: 'How can I track my...' },
 ];
-
-function getAIResponse(userMessage: string): string {
-  const lower = userMessage.toLowerCase();
-  if (lower.includes('thank you') || lower.includes('pastor')) {
-    return "Here's a semi-formal thank you message:\n\n\"Dear Pastor [Name],\n\nI wanted to take a moment to express my heartfelt gratitude for your generous financial support. Your contribution means so much to me and will help me serve on the mission field. I'm truly blessed to have your support and encouragement.\n\nThank you again for your kindness and generosity.\n\nWith appreciation,\n[Your Name]\"";
-  } else if (lower.includes('friend') || lower.includes('message')) {
-    return "Here's a warm message for your close friends:\n\n\"Hey friends! 👋\n\nI wanted to reach out and let you know how much your support means to me. Whether it's through your prayers, encouragement, or financial help, every bit makes a real difference in my journey. I'm so grateful to have you all in my corner!\n\nLove you all! ❤️\"";
-  } else if (lower.includes('bingo') || lower.includes('fundraiser')) {
-    return "Here are 9 unique Bingo fundraiser ideas for Instagram:\n\n1. Virtual Bingo Night with prizes\n2. Bible Verse Bingo\n3. Monthly Supporter Appreciation Bingo\n4. 'Blessing Bingo' - share daily wins\n5. Recipe Exchange Bingo\n6. Photo Challenge Bingo\n7. Gratitude Bingo (30-day challenge)\n8. Skills & Talents Bingo\n9. Community Service Bingo\n\nEach can be promoted with colorful Instagram stories and posts!";
-  }
-  return "I'm here to help with tracking donations, writing thank you messages, planning fundraisers, and managing your supporter relationships. What would you like assistance with today?";
-}
 
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -63,20 +63,39 @@ export default function Chat() {
     }
   }, [isTyping]);
 
-  const sendMessage = (text?: string) => {
+  const sendMessage = async (text?: string) => {
     const msg = text || inputValue.trim();
-    if (!msg) return;
+    if (!msg || isTyping) return;
     setHasStarted(true);
     const userMsg: Message = { id: Date.now().toString(), text: msg, sender: 'user' };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInputValue('');
     setIsTyping(true);
-    setTimeout(() => {
-      const aiMsg: Message = { id: (Date.now() + 1).toString(), text: getAIResponse(msg), sender: 'ai' };
-      setMessages([...newMessages, aiMsg]);
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            ...newMessages.map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text })),
+          ],
+          max_tokens: 600,
+        }),
+      });
+      const data = await res.json();
+      const reply = data.choices?.[0]?.message?.content || "Sorry, I couldn't get a response. Please try again.";
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), text: reply, sender: 'ai' }]);
+    } catch {
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), text: "Connection error. Please check your internet and try again.", sender: 'ai' }]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   return (

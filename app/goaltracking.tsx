@@ -3,16 +3,7 @@ import { View, Text, Pressable, StyleSheet, ScrollView, TextInput } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-
-interface Deadline {
-  id: string; name: string; date: string; amount: number;
-}
-
-const initialDeadlines: Deadline[] = [
-  { id: '1', name: 'Deadline 1', date: '2026-02-22', amount: 3600 },
-  { id: '2', name: 'Deadline 2', date: '2026-03-15', amount: 4000 },
-  { id: '3', name: 'Deadline 3', date: '2026-04-22', amount: 5000 },
-];
+import { useApp, Deadline } from '../lib/context';
 
 function formatDateLabel(dateStr: string): string {
   try {
@@ -25,18 +16,46 @@ function formatDateLabel(dateStr: string): string {
 
 export default function GoalTracking() {
   const router = useRouter();
-  const [fundGoal, setFundGoal] = useState('3600');
+  const { goal, updateGoal, deadlines, updateDeadlines } = useApp();
+  const [fundGoal, setFundGoal] = useState(goal > 0 ? goal.toString() : '');
   const [isEditingGoal, setIsEditingGoal] = useState(false);
-  const [deadlines, setDeadlines] = useState<Deadline[]>(initialDeadlines);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
+  const [showAddDeadline, setShowAddDeadline] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [newAmount, setNewAmount] = useState('');
+
+  const handleSaveGoal = () => {
+    const parsed = parseFloat(fundGoal);
+    if (!isNaN(parsed)) updateGoal(parsed);
+    setIsEditingGoal(false);
+  };
 
   const handleSaveDeadline = () => {
     if (editingDeadline && editingId) {
-      setDeadlines(deadlines.map(d => d.id === editingId ? editingDeadline : d));
+      updateDeadlines(deadlines.map(d => d.id === editingId ? editingDeadline : d));
       setEditingId(null);
       setEditingDeadline(null);
     }
+  };
+
+  const handleAddDeadline = () => {
+    if (newDate && newAmount) {
+      const newDeadline: Deadline = {
+        id: Date.now().toString(),
+        name: newName || `Deadline ${deadlines.length + 1}`,
+        date: newDate,
+        amount: parseFloat(newAmount) || 0,
+      };
+      updateDeadlines([...deadlines, newDeadline]);
+      setNewName(''); setNewDate(''); setNewAmount('');
+      setShowAddDeadline(false);
+    }
+  };
+
+  const handleDeleteDeadline = (id: string) => {
+    updateDeadlines(deadlines.filter(d => d.id !== id));
   };
 
   return (
@@ -85,7 +104,7 @@ export default function GoalTracking() {
               )}
             </View>
             {isEditingGoal ? (
-              <Pressable onPress={() => setIsEditingGoal(false)} style={styles.saveBtn}>
+              <Pressable onPress={handleSaveGoal} style={styles.saveBtn}>
                 <Text style={styles.saveBtnText}>Save</Text>
               </Pressable>
             ) : (
@@ -102,10 +121,28 @@ export default function GoalTracking() {
         {/* Deadlines */}
         <View style={styles.deadlinesHeader}>
           <Text style={styles.sectionHeader}>DEADLINES</Text>
-          <Pressable style={styles.addBtn}>
+          <Pressable onPress={() => setShowAddDeadline(true)} style={styles.addBtn}>
             <Text style={styles.addBtnText}>+ Add New</Text>
           </Pressable>
         </View>
+
+        {showAddDeadline && (
+          <View style={styles.deadlineCard}>
+            <Text style={styles.editFieldLabel}>Name (optional)</Text>
+            <TextInput style={styles.editInput} value={newName} onChangeText={setNewName} placeholder={`Deadline ${deadlines.length + 1}`} placeholderTextColor="#9CA3AF" />
+            <Text style={styles.editFieldLabel}>Date (YYYY-MM-DD)</Text>
+            <TextInput style={styles.editInput} value={newDate} onChangeText={setNewDate} placeholder="2026-04-01" placeholderTextColor="#9CA3AF" />
+            <Text style={styles.editFieldLabel}>Target Amount</Text>
+            <View style={styles.editAmountRow}>
+              <Text style={styles.editDollar}>$</Text>
+              <TextInput style={[styles.editInput, { flex: 1, marginBottom: 0 }]} value={newAmount} onChangeText={setNewAmount} keyboardType="numeric" placeholder="1000" placeholderTextColor="#9CA3AF" />
+            </View>
+            <View style={[styles.editActions, { marginTop: 12 }]}>
+              <Pressable onPress={handleAddDeadline} style={styles.saveChangesBtn}><Text style={styles.saveChangesBtnText}>Add Deadline</Text></Pressable>
+              <Pressable onPress={() => setShowAddDeadline(false)} style={styles.cancelBtn}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
+            </View>
+          </View>
+        )}
 
         {deadlines.map(deadline => {
           const isEditing = editingId === deadline.id;
@@ -158,7 +195,7 @@ export default function GoalTracking() {
                         <Text style={styles.deadlineDate}>{formatDateLabel(deadline.date)}</Text>
                       </View>
                     </View>
-                    <Pressable onPress={() => setDeadlines(deadlines.filter(d => d.id !== deadline.id))}>
+                    <Pressable onPress={() => handleDeleteDeadline(deadline.id)}>
                       <Text style={styles.deleteIcon}>✕</Text>
                     </Pressable>
                   </View>

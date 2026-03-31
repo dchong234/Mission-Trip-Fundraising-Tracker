@@ -6,10 +6,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle, G, Rect, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
-
-const RAISED = 2700;
-const GOAL = 3600;
-const PROGRESS = RAISED / GOAL;
+import { useApp } from '../../lib/context';
 
 const VERSES = [
   '"Go therefore and make disciples of all nations..." - Matthew 28:19',
@@ -20,34 +17,41 @@ const VERSES = [
   '"As the Father has sent me, I am sending you." - John 20:21',
 ];
 
-const DONATIONS = [
-  { id: 1, name: 'Mom', date: 'Nov 16, 2025', amount: 20 },
-  { id: 2, name: 'Dad', date: 'Nov 15, 2025', amount: 50 },
-  { id: 3, name: 'Sarah', date: 'Nov 14, 2025', amount: 35 },
-];
-
-const FUND_LOCATIONS = [
-  { label: 'Zelle', amount: 1004, color: '#4aa0c4', icon: '💳' },
-  { label: 'Venmo', amount: 750, color: '#7bb7d1', icon: '📱' },
-  { label: 'Cash', amount: 200, color: '#1d3a6d', icon: '💵' },
-  { label: 'Other', amount: 80, color: '#a4c9df', icon: '📊' },
-];
-
 function getBezierPoint(t: number) {
   const x = (1 - t) ** 2 * 20 + 2 * (1 - t) * t * 180 + t ** 2 * 340;
   const y = (1 - t) ** 2 * 90 + 2 * (1 - t) * t * 20 + t ** 2 * 90;
   return { x, y };
 }
 
-const planePos = getBezierPoint(PROGRESS);
-
 export default function Home() {
   const router = useRouter();
+  const { donations, goal, deadlines } = useApp();
   const [animPaused, setAnimPaused] = useState(false);
   const [currentVerse, setCurrentVerse] = useState(VERSES[0]);
   const cloud1 = useRef(new Animated.Value(0)).current;
   const cloud2 = useRef(new Animated.Value(1)).current;
-  const total = FUND_LOCATIONS.reduce((s, f) => s + f.amount, 0);
+
+  const RAISED = donations.reduce((s, d) => s + d.amount, 0);
+  const GOAL = goal;
+  const PROGRESS = GOAL > 0 ? Math.min(RAISED / GOAL, 1) : 0;
+  const planePos = getBezierPoint(PROGRESS);
+
+  // Build fund breakdown by method
+  const methodTotals: Record<string, number> = {};
+  donations.forEach(d => {
+    const key = d.method || 'Other';
+    methodTotals[key] = (methodTotals[key] || 0) + d.amount;
+  });
+  const METHOD_COLORS: Record<string, string> = {
+    Zelle: '#4aa0c4', Venmo: '#7bb7d1', Cash: '#1d3a6d', Check: '#287AB8', Other: '#a4c9df',
+  };
+  const METHOD_ICONS: Record<string, string> = {
+    Zelle: '💳', Venmo: '📱', Cash: '💵', Check: '✍️', Other: '📊',
+  };
+  const FUND_LOCATIONS = Object.entries(methodTotals).map(([label, amount]) => ({
+    label, amount, color: METHOD_COLORS[label] || '#a4c9df', icon: METHOD_ICONS[label] || '📊',
+  }));
+  const total = RAISED;
 
   useEffect(() => {
     const a1 = Animated.loop(Animated.timing(cloud1, { toValue: 1, duration: 30000, useNativeDriver: true }));
@@ -130,39 +134,62 @@ export default function Home() {
             <Text style={styles.viewAll}>View All</Text>
           </Pressable>
         </View>
-        {DONATIONS.map((d) => (
-          <Pressable key={d.id} onPress={() => router.push('/transaction')} style={({ pressed }) => [styles.donationRow, pressed && { opacity: 0.8 }]}>
-            <View>
-              <Text style={styles.donorName}>{d.name}</Text>
-              <Text style={styles.donorDate}>{d.date}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Text style={styles.donationAmt}>+${d.amount}</Text>
-              <Text style={styles.chevron}>›</Text>
-            </View>
-          </Pressable>
-        ))}
+        {donations.length === 0 ? (
+          <View style={styles.emptyDonations}>
+            <Text style={styles.emptyDonationsText}>No donations yet — tap + to add one!</Text>
+          </View>
+        ) : (
+          donations.slice(0, 3).map((d) => (
+            <Pressable key={d.id} onPress={() => router.push({ pathname: '/transaction', params: { id: d.id } })} style={({ pressed }) => [styles.donationRow, pressed && { opacity: 0.8 }]}>
+              <View>
+                <Text style={styles.donorName}>{d.name}</Text>
+                <Text style={styles.donorDate}>{d.date}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Text style={styles.donationAmt}>+${d.amount.toLocaleString()}</Text>
+                <Text style={styles.chevron}>›</Text>
+              </View>
+            </Pressable>
+          ))
+        )}
 
         {/* Upcoming Deadlines */}
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Upcoming Deadlines</Text>
-        <View style={styles.deadlineMain}>
-          <View style={styles.deadlineBadge}><Text style={styles.deadlineBadgeText}>T-47 days</Text></View>
-          <Text style={styles.deadlineLabel}>DEADLINE 1</Text>
-          <Text style={styles.deadlineDate}>Feb 22, 2026</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={styles.checkDot}><Text style={{ color: 'white', fontSize: 11, fontWeight: '700' }}>✓</Text></View>
-            <Text style={styles.onTrack}>You're on track</Text>
-          </View>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
-          {[{ label: 'DEADLINE 2', date: 'Mar 15, 2026', days: 'T-83 days' }, { label: 'DEADLINE 3', date: 'Apr 22, 2026', days: 'T-121 days' }].map((d, i) => (
-            <View key={i} style={[styles.deadlineSmall, i === 0 ? styles.deadlineSmallLeft : styles.deadlineSmallRight]}>
-              <Text style={styles.deadlineSmallLabel}>{d.label}</Text>
-              <Text style={styles.deadlineSmallDate}>{d.date}</Text>
-              <View style={styles.amberBadge}><Text style={styles.amberBadgeText}>{d.days}</Text></View>
-            </View>
-          ))}
-        </View>
+        {deadlines.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Upcoming Deadlines</Text>
+            {deadlines.slice(0, 1).map((dl) => {
+              const daysLeft = Math.ceil((new Date(dl.date).getTime() - Date.now()) / 86400000);
+              const onTrack = RAISED >= dl.amount * 0.5;
+              return (
+                <View key={dl.id} style={styles.deadlineMain}>
+                  <View style={styles.deadlineBadge}>
+                    <Text style={styles.deadlineBadgeText}>{daysLeft > 0 ? `T-${daysLeft} days` : 'Past'}</Text>
+                  </View>
+                  <Text style={styles.deadlineLabel}>{dl.name.toUpperCase()}</Text>
+                  <Text style={styles.deadlineDate}>{dl.date}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={styles.checkDot}><Text style={{ color: 'white', fontSize: 11, fontWeight: '700' }}>✓</Text></View>
+                    <Text style={styles.onTrack}>{onTrack ? "You're on track" : `$${dl.amount.toLocaleString()} needed`}</Text>
+                  </View>
+                </View>
+              );
+            })}
+            {deadlines.length > 1 && (
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
+                {deadlines.slice(1, 3).map((dl, i) => {
+                  const daysLeft = Math.ceil((new Date(dl.date).getTime() - Date.now()) / 86400000);
+                  return (
+                    <View key={dl.id} style={[styles.deadlineSmall, i === 0 ? styles.deadlineSmallLeft : styles.deadlineSmallRight]}>
+                      <Text style={styles.deadlineSmallLabel}>{dl.name.toUpperCase()}</Text>
+                      <Text style={styles.deadlineSmallDate}>{dl.date}</Text>
+                      <View style={styles.amberBadge}><Text style={styles.amberBadgeText}>{daysLeft > 0 ? `T-${daysLeft} days` : 'Past'}</Text></View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </>
+        )}
 
         {/* Fund Allocation */}
         <Text style={styles.sectionTitle}>Fund Allocation</Text>
@@ -270,4 +297,6 @@ const styles = StyleSheet.create({
   fundAmt: { fontSize: 17, fontWeight: '700', color: '#111' },
   barBg: { height: 10, backgroundColor: '#F3F4F6', borderRadius: 5, overflow: 'hidden', marginTop: 6 },
   barFill: { height: 10, borderRadius: 5 },
+  emptyDonations: { backgroundColor: 'white', borderRadius: 10, padding: 20, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 10 },
+  emptyDonationsText: { fontSize: 14, color: '#9CA3AF' },
 });

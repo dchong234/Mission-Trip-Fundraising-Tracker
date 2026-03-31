@@ -3,16 +3,41 @@ import {
   View, Text, Pressable, StyleSheet, ScrollView, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useApp } from '../lib/context';
 
 export default function Transaction() {
   const router = useRouter();
-  const [isEditing, setIsEditing] = useState(false);
-  const [amount, setAmount] = useState('150.00');
-  const [thankYouSent, setThankYouSent] = useState(true);
-  const [method, setMethod] = useState('Zelle');
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { donations, toggleThankYou, toggleFavorite, removeDonation } = useApp();
 
-  const paymentMethods = ['Zelle', 'Venmo', 'Cash', 'Check', 'Other'];
+  const donation = donations.find(d => d.id === id);
+
+  const [isEditing, setIsEditing] = useState(false);
+
+  if (!donation) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>‹</Text>
+          </Pressable>
+          <Text style={styles.headerTitle}>Donation Details</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 16, color: '#9CA3AF' }}>Donation not found</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const initials = donation.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+  const handleDelete = () => {
+    removeDonation(donation.id);
+    router.back();
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -22,8 +47,8 @@ export default function Transaction() {
           <Text style={styles.backBtnText}>‹</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Donation Details</Text>
-        <Pressable style={styles.shareBtn}>
-          <Text style={styles.shareBtnText}>↗</Text>
+        <Pressable onPress={handleDelete} style={styles.shareBtn}>
+          <Text style={styles.shareBtnText}>🗑</Text>
         </Pressable>
       </View>
 
@@ -32,37 +57,24 @@ export default function Transaction() {
         <View style={styles.profileSection}>
           <View style={styles.avatarWrapper}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>SJ</Text>
+              <Text style={styles.avatarText}>{initials}</Text>
             </View>
           </View>
-          <Text style={styles.donorName}>Sarah Jenkins</Text>
+          <Text style={styles.donorName}>{donation.name}</Text>
+          {donation.isFavorite && <Text style={{ fontSize: 18, marginTop: 4 }}>❤️</Text>}
         </View>
 
         {/* Amount Card */}
         <View style={styles.amountCard}>
           <Text style={styles.amountCardLabel}>TOTAL CONTRIBUTION</Text>
-          {isEditing ? (
-            <View style={styles.amountEditRow}>
-              <Text style={styles.amountDollarEdit}>$</Text>
-              <TextInput
-                style={styles.amountInput}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="decimal-pad"
-              />
-            </View>
-          ) : (
-            <Text style={styles.amountValue}>
-              <Text style={styles.amountDollar}>$</Text>
-              {parseFloat(amount).toFixed(2)}
-            </Text>
-          )}
-          {!isEditing && (
-            <View style={styles.statusBadge}>
-              <View style={styles.statusDot} />
-              <Text style={styles.statusText}>Transaction Complete</Text>
-            </View>
-          )}
+          <Text style={styles.amountValue}>
+            <Text style={styles.amountDollar}>$</Text>
+            {donation.amount.toFixed(2)}
+          </Text>
+          <View style={styles.statusBadge}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>Transaction Complete</Text>
+          </View>
         </View>
 
         {/* Details Card */}
@@ -74,7 +86,7 @@ export default function Transaction() {
             </View>
             <View style={styles.detailText}>
               <Text style={styles.detailRowLabel}>DATE</Text>
-              <Text style={styles.detailRowValue}>Oct 24, 2023</Text>
+              <Text style={styles.detailRowValue}>{donation.date}</Text>
             </View>
           </View>
 
@@ -84,29 +96,15 @@ export default function Transaction() {
           <View style={styles.detailRow}>
             <View style={styles.detailIcon}>
               <View style={styles.zelleIcon}>
-                <Text style={styles.zelleIconText}>Z</Text>
+                <Text style={styles.zelleIconText}>{donation.method[0]}</Text>
               </View>
             </View>
             <View style={styles.detailText}>
               <Text style={styles.detailRowLabel}>PAYMENT METHOD</Text>
-              {isEditing ? (
-                <View style={styles.methodPills}>
-                  {paymentMethods.map(m => (
-                    <Pressable
-                      key={m}
-                      onPress={() => setMethod(m)}
-                      style={[styles.methodPill, method === m && styles.methodPillActive]}
-                    >
-                      <Text style={[styles.methodPillText, method === m && styles.methodPillTextActive]}>{m}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.detailRowValue}>{method} Transfer</Text>
-              )}
+              <Text style={styles.detailRowValue}>{donation.method} Transfer</Text>
             </View>
             <View style={styles.methodBadge}>
-              <Text style={styles.methodBadgeText}>{method.toUpperCase()}</Text>
+              <Text style={styles.methodBadgeText}>{donation.method.toUpperCase()}</Text>
             </View>
           </View>
 
@@ -115,19 +113,33 @@ export default function Transaction() {
           {/* Thank You */}
           <Pressable
             style={styles.detailRow}
-            onPress={() => isEditing && setThankYouSent(!thankYouSent)}
+            onPress={() => toggleThankYou(donation.id)}
           >
             <View style={styles.detailIcon}>
               <Text style={styles.detailIconEmoji}>✉️</Text>
             </View>
             <View style={styles.detailText}>
               <Text style={styles.detailRowLabel}>THANK YOU MESSAGE</Text>
-              <Text style={[styles.detailRowValue, thankYouSent && { color: '#008F7A' }]}>
-                {thankYouSent ? 'Sent' : 'Not Sent'}
+              <Text style={[styles.detailRowValue, donation.thankYouSent && { color: '#008F7A' }]}>
+                {donation.thankYouSent ? 'Sent ✓' : 'Not Sent — tap to mark'}
               </Text>
             </View>
-            {isEditing && <Text style={styles.chevron}>›</Text>}
           </Pressable>
+
+          {donation.comments ? (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.detailRow}>
+                <View style={styles.detailIcon}>
+                  <Text style={styles.detailIconEmoji}>📝</Text>
+                </View>
+                <View style={styles.detailText}>
+                  <Text style={styles.detailRowLabel}>NOTES</Text>
+                  <Text style={styles.detailRowValue}>{donation.comments}</Text>
+                </View>
+              </View>
+            </>
+          ) : null}
         </View>
 
         {/* Action buttons */}
@@ -138,15 +150,15 @@ export default function Transaction() {
           >
             <Text style={styles.primaryActionIcon}>💬</Text>
             <Text style={styles.primaryActionText}>
-              {thankYouSent ? 'View Recent' : 'Draft Thank You'}
+              {donation.thankYouSent ? 'View Recent' : 'Draft Thank You'}
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => setIsEditing(!isEditing)}
+            onPress={() => toggleFavorite(donation.id)}
             style={({ pressed }) => [styles.secondaryAction, pressed && { opacity: 0.85 }]}
           >
-            <Text style={styles.secondaryActionIcon}>✏️</Text>
-            <Text style={styles.secondaryActionText}>{isEditing ? 'Done' : 'Edit'}</Text>
+            <Text style={styles.secondaryActionIcon}>{donation.isFavorite ? '❤️' : '🤍'}</Text>
+            <Text style={styles.secondaryActionText}>{donation.isFavorite ? 'Favorited' : 'Favorite'}</Text>
           </Pressable>
         </View>
 
@@ -187,12 +199,6 @@ const styles = StyleSheet.create({
     fontSize: 13, fontWeight: '600', color: '#9CA3AF',
     letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12,
   },
-  amountEditRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  amountDollarEdit: { fontSize: 32, fontWeight: '700', color: '#6B7280' },
-  amountInput: {
-    fontSize: 42, fontWeight: '700', color: '#111',
-    borderWidth: 2, borderColor: '#4aa0c4', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, minWidth: 140,
-  },
   amountValue: { fontSize: 42, fontWeight: '700', color: '#111', marginBottom: 16 },
   amountDollar: { color: '#6B7280' },
   statusBadge: {
@@ -218,16 +224,7 @@ const styles = StyleSheet.create({
   detailRowValue: { fontSize: 16, fontWeight: '700', color: '#111' },
   methodBadge: { backgroundColor: '#F3F4F6', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
   methodBadgeText: { fontSize: 11, fontWeight: '700', color: '#111', letterSpacing: 0.5 },
-  methodPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
-  methodPill: {
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12,
-    backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB',
-  },
-  methodPillActive: { backgroundColor: '#4aa0c4', borderColor: '#4aa0c4' },
-  methodPillText: { fontSize: 13, fontWeight: '500', color: '#374151' },
-  methodPillTextActive: { color: 'white' },
   divider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 16 },
-  chevron: { fontSize: 22, color: '#9CA3AF' },
   actionsRow: { flexDirection: 'row', gap: 12, marginBottom: 8 },
   primaryAction: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

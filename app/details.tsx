@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useApp } from '../lib/context';
 
 const COUNTRIES = [
   { name: 'North India', flag: '🇮🇳' },
@@ -20,6 +21,7 @@ interface Deadline { id: string; date: string; amount: string; }
 
 export default function Details() {
   const router = useRouter();
+  const { setMissionDetails, updateGoal, updateDeadlines } = useApp();
   const [selectedCountry, setSelectedCountry] = useState('');
   const [departureDate, setDepartureDate] = useState('');
   const [fundraisingGoal, setFundraisingGoal] = useState('');
@@ -39,6 +41,20 @@ export default function Details() {
 
   const handleRemove = (id: string) => setDeadlines(deadlines.filter(d => d.id !== id));
 
+  const handleGetStarted = () => {
+    if (selectedCountry) setMissionDetails(selectedCountry, departureDate);
+    if (fundraisingGoal) updateGoal(parseFloat(fundraisingGoal));
+    if (deadlines.length > 0) {
+      updateDeadlines(deadlines.map((d, i) => ({
+        id: d.id,
+        name: `Deadline ${i + 1}`,
+        date: d.date,
+        amount: parseFloat(d.amount) || 0,
+      })));
+    }
+    router.replace('/(tabs)');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
@@ -46,7 +62,6 @@ export default function Details() {
           <Text style={styles.title}>Mission Details</Text>
           <Text style={styles.subtitle}>Tell us about your mission journey</Text>
 
-          {/* Country selection */}
           <Text style={styles.label}>Mission Country</Text>
           <View style={styles.countryGrid}>
             {COUNTRIES.map((c) => (
@@ -63,7 +78,6 @@ export default function Details() {
             ))}
           </View>
 
-          {/* Departure date */}
           <Text style={styles.label}>Departure Date</Text>
           <TextInput
             style={styles.input}
@@ -73,7 +87,6 @@ export default function Details() {
             onChangeText={setDepartureDate}
           />
 
-          {/* Fundraising goal */}
           <Text style={styles.label}>Fundraising Goal</Text>
           <View style={styles.dollarInputRow}>
             <Text style={styles.dollarSign}>$</Text>
@@ -87,7 +100,6 @@ export default function Details() {
             />
           </View>
 
-          {/* Deadlines */}
           <Text style={styles.label}>Financial Deadlines (Optional)</Text>
           {deadlines.map((d) => (
             <View key={d.id} style={styles.deadlineRow}>
@@ -137,7 +149,7 @@ export default function Details() {
           )}
 
           <Pressable
-            onPress={() => router.replace('/(tabs)')}
+            onPress={handleGetStarted}
             style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
           >
             <Text style={styles.primaryButtonText}>Get Started →</Text>
@@ -156,104 +168,52 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 12, marginTop: 4 },
   smallLabel: { fontSize: 13, fontWeight: '500', color: '#374151', marginBottom: 6 },
   input: {
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#111',
-    marginBottom: 16,
+    backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#D1D5DB',
+    borderRadius: 8, paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 15, color: '#111', marginBottom: 16,
   },
   dollarInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    marginBottom: 24,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB',
+    borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8,
+    paddingHorizontal: 16, marginBottom: 24,
   },
   dollarSign: { fontSize: 16, color: '#666', marginRight: 4 },
   dollarInput: { flex: 1, paddingVertical: 14, fontSize: 15, color: '#111' },
-  countryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 24,
-  },
+  countryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
   countryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: 'white',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 2, borderColor: '#D1D5DB', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 10, backgroundColor: 'white',
   },
   countryButtonSelected: { borderColor: '#4aa0c4', backgroundColor: 'rgba(74,160,196,0.05)' },
   countryFlag: { fontSize: 22 },
   countryName: { fontSize: 14, fontWeight: '600', color: '#374151' },
   countryNameSelected: { color: '#4aa0c4' },
   deadlineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#D1D5DB',
+    borderRadius: 10, padding: 12, marginBottom: 8,
   },
   deadlineText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#111' },
   deadlineAmount: { fontSize: 13, color: '#555' },
   removeText: { fontSize: 16, color: '#999' },
   addDeadlineBox: {
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#D1D5DB',
+    borderRadius: 12, padding: 16, marginBottom: 16,
   },
   addDeadlineButtons: { flexDirection: 'row', gap: 8 },
-  addBtn: {
-    flex: 1,
-    backgroundColor: '#4aa0c4',
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
+  addBtn: { flex: 1, backgroundColor: '#4aa0c4', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
   addBtnText: { fontSize: 15, fontWeight: '600', color: 'white' },
-  cancelBtn: {
-    flex: 1,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
+  cancelBtn: { flex: 1, borderWidth: 2, borderColor: '#D1D5DB', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: '#374151' },
   addDeadlineTrigger: {
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 24,
+    borderWidth: 2, borderColor: '#D1D5DB', borderRadius: 12,
+    paddingVertical: 14, alignItems: 'center', marginBottom: 24,
   },
   addDeadlineTriggerText: { fontSize: 15, fontWeight: '500', color: '#555' },
   primaryButton: {
-    backgroundColor: '#4aa0c4',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
+    backgroundColor: '#4aa0c4', borderRadius: 12, paddingVertical: 16,
+    alignItems: 'center', marginTop: 8,
   },
   primaryButtonPressed: { backgroundColor: '#1d3a6d' },
   primaryButtonText: { fontSize: 17, fontWeight: '600', color: 'white' },
